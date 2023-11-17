@@ -4,7 +4,6 @@
 	import * as twgl from 'twgl.js/dist/5.x/twgl-full.js';
 
 	import img from '$lib/images/image2.png';
-
 	const m4 = twgl.m4;
 	twgl.setDefaults({ attribPrefix: 'a_' });
 
@@ -35,8 +34,8 @@
       }
     `;
 
-	const LINE_COUNT = 8000;
-	const TRAIL_COUNT = 3;
+	const LINE_COUNT = 2000;
+	const TRAIL_COUNT = 4;
 	const INTERVAL_LENGTH = 40;
 	const SCALE = 0.5;
 	//const LINE_PAYLOAD_SIZE = 9 + TRAIL_COUNT * 10;
@@ -368,6 +367,6 @@
 />
 
 <div class='w-screen h-screen flex justify-center'>
-	<canvas bind:this={ff_canvas} class='z-10 absolute self-center border-white border-2 left-0 top-0 w-96' />
+	<canvas bind:this={ff_canvas} class='z-10 absolute self-center border-white border-2 left-0 top-0 w-screen h-screen hidden' />
 	<canvas bind:this={canvas} id="canvas" class="absolute self-center w-screen h-screen" />
 </div>
