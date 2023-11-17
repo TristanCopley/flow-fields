@@ -3,10 +3,13 @@
 	import chroma from 'chroma-js';
 	import * as twgl from 'twgl.js/dist/5.x/twgl-full.js';
 
+	import img from '$lib/images/image2.png';
+
 	const m4 = twgl.m4;
 	twgl.setDefaults({ attribPrefix: 'a_' });
 
 	let canvas: HTMLCanvasElement;
+	let ff_canvas: HTMLCanvasElement;
 	let animate: () => void;
 
 	const vs = `
@@ -32,83 +35,178 @@
       }
     `;
 
-	const LINE_COUNT = 20000;
-	const TRAIL_COUNT = 1;
-	const LINE_PAYLOAD_SIZE = 9 + TRAIL_COUNT * 10;
+	const LINE_COUNT = 8000;
+	const TRAIL_COUNT = 3;
+	const INTERVAL_LENGTH = 40;
+	const SCALE = 0.5;
+	//const LINE_PAYLOAD_SIZE = 9 + TRAIL_COUNT * 10;
+
+	let lines = [] as {
+		speed: number;
+		life: number;
+		x: number;
+		y: number;
+		xv: number;
+		yv: number;
+		color: number[];
+		max_trail_length: number;
+		trail: {
+			x: number;
+			y: number;
+			color: number[];
+		}[];
+	}[];
 
 	// trail_length, speed, color, x, y, xv, yv, [...[color, x, y]]
-	let line_data_buffer = new Float32Array(LINE_PAYLOAD_SIZE * LINE_COUNT);
+	//let line_data_buffer = new Float32Array(LINE_PAYLOAD_SIZE * LINE_COUNT);
 
 	let gl: WebGLRenderingContext;
 
+	function createLine() {
+		let trails = [];
+		let x = Math.random() * 4 + -2;
+		let y = Math.random() * 2 + -1;
+		let color = [0, 0, 0, 1];
 
-	function instantiateLines(gl: WebGLRenderingContext) {
+		for (let k = 0; k < Math.floor(Math.random() * TRAIL_COUNT + 1); k++) {
+			let trail_1 = {
+				x: x,
+				y: y,
+				color: color
+			};
+			trails.push(trail_1);
 
-		let color_array = [];
-		let position_array = [];
+			let trail_2 = {
+				x: x,
+				y: y,
+				color: color
+			};
+			trails.push(trail_2);
+		}
 
-		for (let i = 0; i < line_data_buffer.length; i += LINE_PAYLOAD_SIZE) {
-			line_data_buffer[i] = 0; // trail length
-			line_data_buffer[i + 1] = 1; // speed
+		lines.push({
+			speed: Math.random() * 1 + 0.3,
+			life: 100 + Math.random() * 300,
+			x: x,
+			y: y,
+			max_trail_length: trails.length,
+			xv: 0,
+			yv: 0,
+			color: color,
+			trail: trails
+		});
+	}
 
-			// color
-			let color = chroma.random().rgb(); // color
-			line_data_buffer[i + 2] = color[0]; // r
-			line_data_buffer[i + 3] = color[1]; // g
-			line_data_buffer[i + 4] = color[2]; // b
+	function addImageProcess(src: string): Promise<HTMLImageElement> {
+		return new Promise((resolve, reject) => {
+			let img = new Image()
+			img.onload = () => resolve(img)
+			img.onerror = reject
+			img.src = src
+		})
+	}
 
-			// position
-			line_data_buffer[i + 5] = Math.random() * 0.002 + -0.001; // x
-			line_data_buffer[i + 6] = Math.random() * 0.002 + -0.001; // y
+	function instantiateBuffer(gl: WebGLRenderingContext) {
+		let position_array = [] as number[];
+		let color_array = [] as number[];
 
-			// velocity
-			line_data_buffer[i + 7] = Math.random() * 0.002 + -0.001; // x
-			line_data_buffer[i + 8] = Math.random() * 0.002 + -0.001; // y
+		return twgl.createBufferInfoFromArrays(gl, {
+			position: {
+				data: position_array,
+				numComponents: 2,
+				drawType: gl.DYNAMIC_DRAW
+			},
+			color: {
+				data: color_array,
+				numComponents: 3,
+				drawType: gl.DYNAMIC_DRAW
+			}
+		});
+	}
 
-			// creates TRAIL_COUNT * 2 particles for lines
-			for (let k = 0; k < TRAIL_COUNT * 2; k++) {
+	async function createFlowField() {
 
-				// color
-				let color = chroma.random().rgb(); // color
-				line_data_buffer[i + 9 + k * 5] = color[0]; // r
-				line_data_buffer[i + 10 + k * 5] = color[1]; // g
-				line_data_buffer[i + 11 + k * 5] = color[2]; // b
-				color_array.push(...color);
+		let flow_field_array = [] as number[][][];
 
-				// position
-				line_data_buffer[i + 12 + k * 5] = line_data_buffer[i + 5]; // x
-				line_data_buffer[i + 13 + k * 5] = line_data_buffer[i + 6]; // y
-				position_array.push(line_data_buffer[i + 12 + k * 5], line_data_buffer[i + 13 + k * 5]);
-				
+		const CANVAS_DETAIL = 200;
+
+		const cw = CANVAS_DETAIL * 2;
+		const ch = CANVAS_DETAIL;
+
+		ff_canvas.width = cw;
+		ff_canvas.height = ch;
+
+		let ff_ctx = ff_canvas.getContext('2d') as CanvasRenderingContext2D;
+
+		ff_ctx.fillStyle = 'gray';
+		ff_ctx.fillRect(0, 0, CANVAS_DETAIL * 2, CANVAS_DETAIL);
+
+		ff_ctx.fillStyle = 'yellow';
+		ff_ctx.fillRect(0, 0, cw * 0.5, ch * 0.5);
+
+		ff_ctx.fillStyle = 'blue';
+		ff_ctx.fillRect(cw * 0.5, 0, cw * 0.5, ch * 0.5);
+
+		ff_ctx.fillStyle = 'green';
+		ff_ctx.fillRect(cw * 0.5, ch * 0.5, cw * 0.5, ch * 0.5);
+
+		ff_ctx.fillStyle = 'white';
+		ff_ctx.fillRect(cw * 0.25, ch * 0.25, cw * 0.5, ch * 0.5);
+
+		let image = await addImageProcess(img);
+		ff_ctx.drawImage(image, 0, 0, cw, ch);
+
+		let { data, height, width} = ff_ctx.getImageData(0, 0, cw, ch);
+
+		for (let x = 0; x < width; x++) {
+			flow_field_array[x] = [];
+			for (let y = 0; y < height; y++) {
+				let i = (x + y * width) * 4;
+				let r = data[i];
+				let g = data[i + 1];
+				let b = data[i + 2];
+				let a = data[i + 3];
+
+				flow_field_array[x][y] = [r, g, b, a];//(r+g+b)/(3*255) * Math.PI * 2;
+
 			}
 		}
 
-		return twgl.createBufferInfoFromArrays(gl, {
-			position: { 
-				data: position_array, 
-				numComponents: 2,
-				drawType: gl.DYNAMIC_DRAW 
-				
-			},
-			color: { 
-				data: color_array, 
-				numComponents: 3,
-				drawType: gl.DYNAMIC_DRAW 
-			},
-		});
+		return {
+			array: flow_field_array,
+			width,
+			height
+		};
+		
+	}
+
+	function clamp(x: number, min: number, max: number) {
+		return Math.min(Math.max(x, min), max);
+	}
+
+	function getNearestFlowFieldDirection(flow_field: {array: number[][][], height: number, width: number}, x: number, y: number) {
+
+		return flow_field.array[
+			clamp(Math.floor(((x + 2) / 4) * flow_field.width), 0, flow_field.width - 1)
+		][
+			clamp(Math.floor(((y + 1) / 2) * flow_field.height), 0, flow_field.height - 1)
+		];
 
 	}
 
-	onMount(() => {
+	onMount(async () => {
+
 		gl = canvas.getContext('webgl') as WebGLRenderingContext;
 		if (!gl) return console.error('No context');
+
+		let flow_field = await createFlowField();
 
 		const programInfo = twgl.createProgramInfo(gl, [vs, fs]);
 
 		let position_array = [] as number[];
 		let color_array = [] as number[];
 
-		let bufferInfo = instantiateLines(gl);;
+		let bufferInfo = instantiateBuffer(gl);
 
 		const uniforms = {
 			u_matrix: m4.identity()
@@ -116,6 +214,7 @@
 
 		let delta_time = 0;
 		let last_time = 0;
+		let interval = 0;
 
 		animate = (time = 0) => {
 			delta_time = time - last_time;
@@ -124,73 +223,116 @@
 			position_array = [];
 			color_array = [];
 
-			for (let i = 0; i < line_data_buffer.length; i += LINE_PAYLOAD_SIZE) {
+			interval++;
+			interval = interval % INTERVAL_LENGTH;
 
-				let trail_length = line_data_buffer[i];
-				let speed = line_data_buffer[i + 1];
+			for (let i = 0; i < lines.length; i++) {
+				let line = lines[i];
+				line.life--;
 
-				let lx = line_data_buffer[i + 5];
-				let ly = line_data_buffer[i + 6];
+				if (line.life < 0) {
+					line.max_trail_length--;
+					line.trail.pop();
+					line.trail.pop();
+				}
+				if (line.max_trail_length <= 0) {
+					lines.splice(i, 1);
+					i--;
+				}
+			}
+
+			while (lines.length < LINE_COUNT) {
+				createLine();
+			}
+
+			for (let i = 0; i < lines.length; i++) {
+				let line = lines[i];
 
 				// update position
-				line_data_buffer[i + 5] += line_data_buffer[i + 7]; // x
-				line_data_buffer[i + 6] += line_data_buffer[i + 8]; // y
+				line.x += line.xv * line.speed;
+				line.y += line.yv * line.speed;
 
-				let nx = line_data_buffer[i + 5];
-				let ny = line_data_buffer[i + 6];
+				let flow_direction_data = getNearestFlowFieldDirection(flow_field, line.x, line.y);
 
-				line_data_buffer[i + 7] += Math.random() * 0.0001 + -0.00005; // x
-				line_data_buffer[i + 8] += Math.random() * 0.0001 + -0.00005; // y
+				let r = flow_direction_data[0];
+				let g = flow_direction_data[1];
+				let b = flow_direction_data[2];
 
-				if (line_data_buffer[i + 5] > 1 || line_data_buffer[i + 5] < -1) {
-					line_data_buffer[i + 7] *= -1;
+				let color = (r+g+b)/(3*255) * Math.PI * 2;
+
+				line.xv += Math.sin(color) * 0.0001;
+				line.yv += Math.cos(color) * 0.0001;
+
+				line.xv *= 0.95;
+				line.yv *= 0.95;
+
+				line.color = chroma(r, g, b).gl();// chroma((line.xv * 600) ** 2, (line.yv * 600)** 2, 0.5, 'hsl').gl();
+
+
+				if (line.x > 2.1 || line.x < -2.1) {
+					line.life = 0;
 				}
 
-				if (line_data_buffer[i + 6] > 1 || line_data_buffer[i + 6] < -1) {
-					line_data_buffer[i + 8] *= -1;
+				if (line.y > 1.05 || line.y < -1.05) {
+					line.life = 0;
 				}
 
+				let a = 1 - interval / INTERVAL_LENGTH;
 
-				// Trail
-
-				// update trail length
-				trail_length += 1;
-				if (trail_length % TRAIL_COUNT === 0 && trail_length > TRAIL_COUNT) {
-					trail_length = TRAIL_COUNT;
+				if (line.trail.length >= 1) {
+					line.trail[0].x = line.x;
+					line.trail[0].y = line.y;
 				}
 
-				let slot = trail_length % TRAIL_COUNT;
+				if (interval === 0) {
+					line.trail.unshift(
+						{
+							x: line.x,
+							y: line.y,
+							color: line.color
+						},
+						{
+							x: line.trail[0]?.x || line.x,
+							y: line.trail[0]?.y || line.y,
+							color: line.color
+						}
+					);
 
-				// update line data
-				line_data_buffer[i] = trail_length;
-
-				line_data_buffer[i + 12 + (slot*2) * 5] = lx;
-				line_data_buffer[i + 13 + (slot*2) * 5] = ly;
-
-				line_data_buffer[i + 12 + (slot*2+1) * 5] = nx// + xv * speed * delta_time / 1000;
-				line_data_buffer[i + 13 + (slot*2+1) * 5] = ny //+ xv * speed * delta_time / 1000;
-
-				for (let k = 0; k < TRAIL_COUNT * 2; k++) {
-
-					// color
-					let color = chroma.random().rgb(); // color
-					line_data_buffer[i + 9 + k * 5] = color[0]; // r
-					line_data_buffer[i + 10 + k * 5] = color[1]; // g
-					line_data_buffer[i + 11 + k * 5] = color[2]; // b
-					color_array.push(Math.floor(color[0]), Math.floor(color[1]), Math.floor(color[2]));
-
-					let x = line_data_buffer[i + 12 + k * 5];
-					let y = line_data_buffer[i + 13 + k * 5];
-					position_array.push(x, y);
-					
+					if (line.trail.length > line.max_trail_length) {
+						line.trail.pop();
+						line.trail.pop();
+					}
 				}
 
+				for (let k = 0; k < line.trail.length; k++) {
+					let trail = line.trail[k];
+
+					if (k + 1 === line.trail.length) {
+						let x = a * trail.x + (1 - a) * line.trail[k - 1].x;
+						let y = a * trail.y + (1 - a) * line.trail[k - 1].y;
+
+						position_array.push(x * SCALE, y * SCALE);
+						color_array.push(...trail.color);
+						continue;
+					}
+
+					position_array.push(trail.x * SCALE, trail.y * SCALE);
+					color_array.push(...trail.color);
+				}
 			}
-			
-			// @ts-expect-error
-			twgl.setAttribInfoBufferFromArray(gl, bufferInfo.attribs.a_position, position_array);
-			// @ts-expect-error
-			twgl.setAttribInfoBufferFromArray(gl, bufferInfo.attribs.a_color, color_array);
+
+			bufferInfo = twgl.createBufferInfoFromArrays(gl, {
+				position: {
+					data: position_array,
+					numComponents: 2,
+					drawType: gl.DYNAMIC_DRAW
+				},
+				color: {
+					data: color_array,
+					numComponents: 4,
+					drawType: gl.DYNAMIC_DRAW
+				}
+			});
 
 			// render stuff
 			twgl.resizeCanvasToDisplaySize(canvas);
@@ -225,4 +367,7 @@
 	}}
 />
 
-<canvas bind:this={canvas} id="canvas" class="w-screen h-screen" />
+<div class='w-screen h-screen flex justify-center'>
+	<canvas bind:this={ff_canvas} class='z-10 absolute self-center border-white border-2 left-0 top-0 w-96' />
+	<canvas bind:this={canvas} id="canvas" class="absolute self-center w-screen h-screen" />
+</div>
