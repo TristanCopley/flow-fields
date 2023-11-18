@@ -2,10 +2,8 @@
 	import { onMount } from 'svelte';
 	import chroma from 'chroma-js';
 	import * as twgl from 'twgl.js/dist/5.x/twgl-full.js';
-	
-	let mounted = false;
-
 	import ColorPicker from 'svelte-awesome-color-picker';
+	import img from '$lib/images/flag.png';
 
 	let rgba: {
 		r: number;
@@ -19,15 +17,10 @@
 		a: 1
 	}
 
-	let files: File[] = [];
+	let mounted = false;
 
-	// $: {
-	// 	if (file) {
-	// 		IMAGE = URL.createObjectURL( new Blob(file));
-	// 	}
-	// }
+	let files: FileList;
 
-	import img from '$lib/images/flag.png';
 	const m4 = twgl.m4;
 	twgl.setDefaults({ attribPrefix: 'a_' });
 
@@ -59,48 +52,86 @@
     `;
 
 	let IMAGE = img;
-	let LINE_COUNT = 10000;
-	let TRAIL_COUNT = 4;
-	let INTERVAL_LENGTH = 40;
+	let LINE_COUNT = 50;
+	let TRAIL_COUNT = 10;
+	let INTERVAL_LENGTH = 8;
 	let SCALE = 0.5;
-	let OPACITY = 1;
+	let OPACITY = 0.5;
 	let BACKGROUND_COLOR = 'black';
-	let CANVAS_DETAIL = 600;
+	let CANVAS_DETAIL = 30;
+	let SPEED = 1;
 
-	let image_bind = 9;
-	let line_count_bind = 40;
-	let trail_count_bind = 4;
-	let interval_length_bind = 40;
-	let scale_bind = 0.5;
-	let opacity_bind = 1;
-	let background_color_bind = 'black';
-	let canvas_detail_bind = 600;
+	let line_count_bind = LINE_COUNT;
+	let trail_count_bind = TRAIL_COUNT;
+	let interval_length_bind = INTERVAL_LENGTH;
+	let scale_bind = SCALE;
+	let opacity_bind = OPACITY;
+	let background_color_bind = BACKGROUND_COLOR;
+	let canvas_detail_bind = CANVAS_DETAIL;
+	let speed_bind = SPEED;
 
 	$: {
 		lines = [];
-		LINE_COUNT = line_count_bind * line_count_bind
+		LINE_COUNT = Math.round(line_count_bind ** 2.2);
 	};
 	$: {
 		lines = [];
-		TRAIL_COUNT = trail_count_bind
+		TRAIL_COUNT = trail_count_bind;
 	};
 	$: {
 		lines = [];
-		INTERVAL_LENGTH = interval_length_bind
+		INTERVAL_LENGTH = interval_length_bind;
 	};
 	$: {
-		SCALE = scale_bind
+		SCALE = scale_bind;
 	};
 	$: {
-		OPACITY = opacity_bind
+		OPACITY = opacity_bind;
 	};
 	$: {
-		BACKGROUND_COLOR = background_color_bind
+		BACKGROUND_COLOR = background_color_bind;
 	};
 	$: {
-		if (mounted) createFlowField();
+		if (mounted) (async ()=>{flow_field = await createFlowField()})();
 		lines = [];
-		CANVAS_DETAIL = canvas_detail_bind * 1.5
+		CANVAS_DETAIL = Math.round(canvas_detail_bind ** 1.5);
+	};
+	$: {
+		if (files?.item(0)) {
+			(async ()=>{
+
+				try {
+					let file = files?.item(0) as File;
+					let blob = URL.createObjectURL(files.item(0));
+					let reader = new FileReader();
+					reader.readAsDataURL(file)
+
+					reader.onloadend = async () => {
+						IMAGE = reader.result as string;
+						flow_field = await createFlowField();
+						lines = [];
+					}
+				} catch (e) {
+					alert("Bad file")
+					console.log(e)
+				}
+
+			})();
+		}
+	}
+	$: {
+		lines = [];
+		SPEED = (speed_bind * speed_bind).toFixed(3);
+	}
+
+	let flow_field: {
+		array: number[][][],
+		width: number,
+		height: number
+	} = {
+		array: [],
+		width: 0,
+		height: 0
 	};
 
 	let lines = [] as {
@@ -144,7 +175,7 @@
 		}
 
 		lines.push({
-			speed: Math.random() * 1 + 0.3,
+			speed: (Math.random() + 0.3) * SPEED,
 			life: 100 + Math.random() * 300,
 			x: x,
 			y: y,
@@ -191,22 +222,22 @@
 		ff_canvas.width = cw;
 		ff_canvas.height = ch;
 
-		let ff_ctx = ff_canvas.getContext('2d') as CanvasRenderingContext2D;
+		let ff_ctx = ff_canvas.getContext('2d', { willReadFrequently: true }) as CanvasRenderingContext2D;
 
-		ff_ctx.fillStyle = 'gray';
-		ff_ctx.fillRect(0, 0, CANVAS_DETAIL * 2, CANVAS_DETAIL);
+		// ff_ctx.fillStyle = 'gray';
+		// ff_ctx.fillRect(0, 0, CANVAS_DETAIL * 2, CANVAS_DETAIL);
 
-		ff_ctx.fillStyle = 'yellow';
-		ff_ctx.fillRect(0, 0, cw * 0.5, ch * 0.5);
+		// ff_ctx.fillStyle = 'yellow';
+		// ff_ctx.fillRect(0, 0, cw * 0.5, ch * 0.5);
 
-		ff_ctx.fillStyle = 'blue';
-		ff_ctx.fillRect(cw * 0.5, 0, cw * 0.5, ch * 0.5);
+		// ff_ctx.fillStyle = 'blue';
+		// ff_ctx.fillRect(cw * 0.5, 0, cw * 0.5, ch * 0.5);
 
-		ff_ctx.fillStyle = 'green';
-		ff_ctx.fillRect(cw * 0.5, ch * 0.5, cw * 0.5, ch * 0.5);
+		// ff_ctx.fillStyle = 'green';
+		// ff_ctx.fillRect(cw * 0.5, ch * 0.5, cw * 0.5, ch * 0.5);
 
-		ff_ctx.fillStyle = 'white';
-		ff_ctx.fillRect(cw * 0.25, ch * 0.25, cw * 0.5, ch * 0.5);
+		// ff_ctx.fillStyle = 'white';
+		// ff_ctx.fillRect(cw * 0.25, ch * 0.25, cw * 0.5, ch * 0.5);
 
 		let image = await addImageProcess(IMAGE);
 		ff_ctx.drawImage(image, 0, 0, cw, ch);
@@ -257,7 +288,7 @@
 		}) as WebGLRenderingContext;
 		if (!gl) return console.error('No context');
 
-		let flow_field = await createFlowField();
+		flow_field = await createFlowField();
 
 		mounted = true;
 
@@ -443,7 +474,7 @@
 	<canvas bind:this={canvas} id="canvas" class="z-10 absolute self-center w-screen h-screen" />
 	<div class='z-40 w-screen h-screen absolute flex left-0 top-0'>
 		<div class='relative w-full h-full'>
-			<div class='flex absolute bg-black border-2 border-white w-64 h-fit p-2 !text-zinc-200 scale-90' >
+			<div class='flex absolute bg-black border-2 border-white w-72 h-fit p-2 !text-zinc-200 scale-90' >
 				<div class='flex flex-col relative w-full gap-2'>
 
 					<div class='w-full flex flex-col gap-1'>
@@ -451,7 +482,7 @@
 							LINE COUNT
 						</span>
 						<div class='flex gap-2 justify-between w-full'>
-							<input type="range" min="0" max="250" class="range range-xs" bind:value={line_count_bind} />
+							<input type="range" min="0" max="300" class="self-center range range-xs" bind:value={line_count_bind} />
 							<span class='w-20'>
 								{LINE_COUNT}
 							</span>
@@ -463,7 +494,7 @@
 							TRAIL COUNT
 						</span>
 						<div class='flex gap-2 justify-between w-full'>
-							<input type="range" min="0" max="250" class="range range-xs" bind:value={trail_count_bind} />
+							<input type="range" min="1" max="250" class="self-center range range-xs" bind:value={trail_count_bind} />
 							<span class='w-20'>
 								{TRAIL_COUNT}
 							</span>
@@ -475,9 +506,21 @@
 							INTERVAL LENGTH
 						</span>
 						<div class='flex gap-2 justify-between w-full'>
-							<input type="range" min="0" max="100" class="range range-xs" bind:value={interval_length_bind} />
+							<input type="range" min="1" max="30" class="self-center range range-xs" bind:value={interval_length_bind} />
 							<span class='w-20'>
 								{INTERVAL_LENGTH}
+							</span>
+						</div>
+					</div>
+
+					<div class='w-full flex flex-col gap-1'>
+						<span class='text-xs'>
+							SPEED
+						</span>
+						<div class='flex gap-2 justify-between w-full'>
+							<input type="range" min="0.0" max="5.0" step="0.0001" class="self-center range range-xs" bind:value={speed_bind} />
+							<span class='w-20'>
+								{SPEED}
 							</span>
 						</div>
 					</div>
@@ -487,7 +530,7 @@
 							SCALE
 						</span>
 						<div class='flex gap-2 justify-between w-full'>
-							<input type="range" min="0.0" max="1.0" step="0.0001" class="range range-xs" bind:value={scale_bind} />
+							<input type="range" min="0.0" max="2.0" step="0.0001" class="self-center range range-xs" bind:value={scale_bind} />
 							<span class='w-20'>
 								{SCALE}
 							</span>
@@ -499,9 +542,21 @@
 							OPACITY
 						</span>
 						<div class='flex gap-2 justify-between w-full'>
-							<input type="range" min="0.0" max="1.0" step="0.0001" class="range range-xs" bind:value={opacity_bind} />
+							<input type="range" min="0.0" max="1.0" step="0.0001" class="self-center range range-xs" bind:value={opacity_bind} />
 							<span class='w-20'>
 								{OPACITY}
+							</span>
+						</div>
+					</div>
+
+					<div class='w-full flex flex-col gap-1'>
+						<span class='text-xs'>
+							FLOW FIELD RESOLUTION
+						</span>
+						<div class='flex gap-2 justify-between w-full'>
+							<input type="range" min="0" max="80" class="self-center range range-xs" bind:value={canvas_detail_bind} />
+							<span class='w-20'>
+								{CANVAS_DETAIL}
 							</span>
 						</div>
 					</div>
@@ -510,7 +565,7 @@
 						<span class='text-xs'>
 							BACKGROUND COLOR
 						</span>
-						<div class=''>
+						<div class='text-black bg-slate-300 p-1'>
 							<ColorPicker bind:rgb={rgba} />
 						</div>
 					</div>
