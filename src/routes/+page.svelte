@@ -2,8 +2,32 @@
 	import { onMount } from 'svelte';
 	import chroma from 'chroma-js';
 	import * as twgl from 'twgl.js/dist/5.x/twgl-full.js';
+	
+	let mounted = false;
 
-	import img from '$lib/images/image2.png';
+	import ColorPicker from 'svelte-awesome-color-picker';
+
+	let rgba: {
+		r: number;
+		g: number;
+		b: number;
+		a: number;
+	} = {
+		r: 0,
+		g: 0,
+		b: 0,
+		a: 1
+	}
+
+	let files: File[] = [];
+
+	// $: {
+	// 	if (file) {
+	// 		IMAGE = URL.createObjectURL( new Blob(file));
+	// 	}
+	// }
+
+	import img from '$lib/images/flag.png';
 	const m4 = twgl.m4;
 	twgl.setDefaults({ attribPrefix: 'a_' });
 
@@ -34,11 +58,50 @@
       }
     `;
 
-	const LINE_COUNT = 2000;
-	const TRAIL_COUNT = 4;
-	const INTERVAL_LENGTH = 40;
-	const SCALE = 0.5;
-	//const LINE_PAYLOAD_SIZE = 9 + TRAIL_COUNT * 10;
+	let IMAGE = img;
+	let LINE_COUNT = 10000;
+	let TRAIL_COUNT = 4;
+	let INTERVAL_LENGTH = 40;
+	let SCALE = 0.5;
+	let OPACITY = 1;
+	let BACKGROUND_COLOR = 'black';
+	let CANVAS_DETAIL = 600;
+
+	let image_bind = 9;
+	let line_count_bind = 40;
+	let trail_count_bind = 4;
+	let interval_length_bind = 40;
+	let scale_bind = 0.5;
+	let opacity_bind = 1;
+	let background_color_bind = 'black';
+	let canvas_detail_bind = 600;
+
+	$: {
+		lines = [];
+		LINE_COUNT = line_count_bind * line_count_bind
+	};
+	$: {
+		lines = [];
+		TRAIL_COUNT = trail_count_bind
+	};
+	$: {
+		lines = [];
+		INTERVAL_LENGTH = interval_length_bind
+	};
+	$: {
+		SCALE = scale_bind
+	};
+	$: {
+		OPACITY = opacity_bind
+	};
+	$: {
+		BACKGROUND_COLOR = background_color_bind
+	};
+	$: {
+		if (mounted) createFlowField();
+		lines = [];
+		CANVAS_DETAIL = canvas_detail_bind * 1.5
+	};
 
 	let lines = [] as {
 		speed: number;
@@ -55,9 +118,6 @@
 			color: number[];
 		}[];
 	}[];
-
-	// trail_length, speed, color, x, y, xv, yv, [...[color, x, y]]
-	//let line_data_buffer = new Float32Array(LINE_PAYLOAD_SIZE * LINE_COUNT);
 
 	let gl: WebGLRenderingContext;
 
@@ -112,13 +172,11 @@
 		return twgl.createBufferInfoFromArrays(gl, {
 			position: {
 				data: position_array,
-				numComponents: 2,
-				drawType: gl.DYNAMIC_DRAW
+				numComponents: 2
 			},
 			color: {
 				data: color_array,
-				numComponents: 3,
-				drawType: gl.DYNAMIC_DRAW
+				numComponents: 3
 			}
 		});
 	}
@@ -126,8 +184,6 @@
 	async function createFlowField() {
 
 		let flow_field_array = [] as number[][][];
-
-		const CANVAS_DETAIL = 200;
 
 		const cw = CANVAS_DETAIL * 2;
 		const ch = CANVAS_DETAIL;
@@ -152,7 +208,7 @@
 		ff_ctx.fillStyle = 'white';
 		ff_ctx.fillRect(cw * 0.25, ch * 0.25, cw * 0.5, ch * 0.5);
 
-		let image = await addImageProcess(img);
+		let image = await addImageProcess(IMAGE);
 		ff_ctx.drawImage(image, 0, 0, cw, ch);
 
 		let { data, height, width} = ff_ctx.getImageData(0, 0, cw, ch);
@@ -195,10 +251,15 @@
 
 	onMount(async () => {
 
-		gl = canvas.getContext('webgl') as WebGLRenderingContext;
+
+		gl = canvas.getContext('webgl', {
+			premultipliedAlpha: false,
+		}) as WebGLRenderingContext;
 		if (!gl) return console.error('No context');
 
 		let flow_field = await createFlowField();
+
+		mounted = true;
 
 		const programInfo = twgl.createProgramInfo(gl, [vs, fs]);
 
@@ -323,13 +384,11 @@
 			bufferInfo = twgl.createBufferInfoFromArrays(gl, {
 				position: {
 					data: position_array,
-					numComponents: 2,
-					drawType: gl.DYNAMIC_DRAW
+					numComponents: 2
 				},
 				color: {
 					data: color_array,
-					numComponents: 4,
-					drawType: gl.DYNAMIC_DRAW
+					numComponents: 4
 				}
 			});
 
@@ -339,7 +398,7 @@
 
 			gl.enable(gl.DEPTH_TEST);
 			gl.enable(gl.CULL_FACE);
-			gl.clearColor(0, 0, 0, 1);
+			gl.clearColor(1, 1, 1, 0);
 			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
 			// Something with camera
@@ -366,7 +425,113 @@
 	}}
 />
 
-<div class='w-screen h-screen flex justify-center'>
-	<canvas bind:this={ff_canvas} class='z-10 absolute self-center border-white border-2 left-0 top-0 w-screen h-screen hidden' />
-	<canvas bind:this={canvas} id="canvas" class="absolute self-center w-screen h-screen" />
+<!--
+
+	let IMAGE = img;
+	let LINE_COUNT = 10000;
+	let TRAIL_COUNT = 4;
+	let INTERVAL_LENGTH = 40;
+	let SCALE = 0.5;
+	let OPACITY = 1;
+	let CANVAS_DETAIL = 600;
+	let BACKGROUND_COLOR = 'black';
+
+-->
+
+<div class='w-screen h-screen flex flex-col justify-center overflow-clip' style='background-color: {`rgba(${rgba.r},${rgba.g},${rgba.b},${rgba.a})`};'>
+	<canvas bind:this={ff_canvas} class='z-0 absolute self-center h-screen' style='transform: scale({SCALE}); opacity: {OPACITY};' />
+	<canvas bind:this={canvas} id="canvas" class="z-10 absolute self-center w-screen h-screen" />
+	<div class='z-40 w-screen h-screen absolute flex left-0 top-0'>
+		<div class='relative w-full h-full'>
+			<div class='flex absolute bg-black border-2 border-white w-64 h-fit p-2 !text-zinc-200 scale-90' >
+				<div class='flex flex-col relative w-full gap-2'>
+
+					<div class='w-full flex flex-col gap-1'>
+						<span class='text-xs'>
+							LINE COUNT
+						</span>
+						<div class='flex gap-2 justify-between w-full'>
+							<input type="range" min="0" max="250" class="range range-xs" bind:value={line_count_bind} />
+							<span class='w-20'>
+								{LINE_COUNT}
+							</span>
+						</div>
+					</div>
+
+					<div class='w-full flex flex-col gap-1'>
+						<span class='text-xs'>
+							TRAIL COUNT
+						</span>
+						<div class='flex gap-2 justify-between w-full'>
+							<input type="range" min="0" max="250" class="range range-xs" bind:value={trail_count_bind} />
+							<span class='w-20'>
+								{TRAIL_COUNT}
+							</span>
+						</div>
+					</div>
+
+					<div class='w-full flex flex-col gap-1'>
+						<span class='text-xs'>
+							INTERVAL LENGTH
+						</span>
+						<div class='flex gap-2 justify-between w-full'>
+							<input type="range" min="0" max="100" class="range range-xs" bind:value={interval_length_bind} />
+							<span class='w-20'>
+								{INTERVAL_LENGTH}
+							</span>
+						</div>
+					</div>
+
+					<div class='w-full flex flex-col gap-1'>
+						<span class='text-xs'>
+							SCALE
+						</span>
+						<div class='flex gap-2 justify-between w-full'>
+							<input type="range" min="0.0" max="1.0" step="0.0001" class="range range-xs" bind:value={scale_bind} />
+							<span class='w-20'>
+								{SCALE}
+							</span>
+						</div>
+					</div>
+
+					<div class='w-full flex flex-col gap-1'>
+						<span class='text-xs'>
+							OPACITY
+						</span>
+						<div class='flex gap-2 justify-between w-full'>
+							<input type="range" min="0.0" max="1.0" step="0.0001" class="range range-xs" bind:value={opacity_bind} />
+							<span class='w-20'>
+								{OPACITY}
+							</span>
+						</div>
+					</div>
+					
+					<div class='flex flex-col gap-1'>
+						<span class='text-xs'>
+							BACKGROUND COLOR
+						</span>
+						<div class=''>
+							<ColorPicker bind:rgb={rgba} />
+						</div>
+					</div>
+
+					<div class='w-full flex flex-col gap-1'>
+						<span class='text-xs'>
+							IMAGE
+						</span>
+						<div class='flex gap-2 justify-between w-full'>
+							<input type="file" class="file-input file-input-sm file-input-bordered w-full max-w-xs bg-black" bind:files={files} />
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
 </div>
+
+<style lang="postcss">
+	.file-input::file-selector-button {
+		color: black;
+		@apply rounded-none bg-slate-300;
+	}
+</style>
