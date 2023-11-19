@@ -135,7 +135,7 @@
 
 	$: {
 		lines = [];
-		SPEED = parseFloat((speed_bind * speed_bind).toFixed(3));
+		SPEED = parseFloat((speed_bind * speed_bind * speed_bind).toFixed(3));
 	}
 
 	let flow_field: {
@@ -405,7 +405,7 @@
 			delta_time = time - last_time;
 			last_time = time;
 
-			delta_time = 1000 / 480;
+			delta_time = 1;
 
 			position_array = [];
 			color_array = [];
@@ -686,7 +686,7 @@
 					<LucideGripVertical class="w-6 h-6 text-black" />
 				</button>
 
-				<div class="flex flex-col relative w-full gap-2 p-2">
+				<div class="flex flex-col relative w-full gap-2 p-2 py-3">
 					<div class="w-full flex flex-col gap-1">
 						<span class="text-xs"> LINE COUNT </span>
 						<div class="flex gap-2 justify-between w-full">
@@ -709,7 +709,7 @@
 							<input
 								type="range"
 								min="1"
-								max="300"
+								max="400"
 								class="self-center range range-xs"
 								bind:value={trail_count_bind}
 							/>
@@ -725,7 +725,7 @@
 							<input
 								type="range"
 								min="0.0"
-								max="10.0"
+								max="3.0"
 								step="0.0001"
 								class="self-center range range-xs"
 								bind:value={speed_bind}
@@ -858,14 +858,14 @@
 						<div class='flex'>
 							<span class="text-xs">RENDER FRAMERATE</span>
 						</div>
-						<div class='flex gap-2'>
-							<button on:click={()=>{RECORD_FRAMERATE = 30}} class='{RECORD_FRAMERATE === 30 ? 'bg-slate-300 text-black' : '-outline-offset-1 bg-black outline-slate-300 outline-1 outline text-slate-300'} text-xs rounded-md px-2 p-1'>
+						<div class='flex gap-2 duration-200 {is_recording ? 'pointer-events-none opacity-30' : 'pointer-events-auto'}'>
+							<button on:click={()=>{RECORD_FRAMERATE = 30}} class='duration-200 {RECORD_FRAMERATE === 30 ? 'bg-slate-300 text-black' : 'text-slate-300 bg-black'} -outline-offset-1 outline-slate-300 outline-1 outline text-xs rounded-md px-2 p-1'>
 								30 FPS
 							</button>
-							<button on:click={()=>{RECORD_FRAMERATE = 60}} class='{RECORD_FRAMERATE === 60 ? 'bg-slate-300 text-black' : '-outline-offset-1 bg-black outline-slate-300 outline-1 outline text-slate-300'} rounded-md px-2 p-1 text-xs'>
+							<button on:click={()=>{RECORD_FRAMERATE = 60}} class='duration-200 {RECORD_FRAMERATE === 60 ? 'bg-slate-300 text-black' : 'text-slate-300 bg-black'} -outline-offset-1 outline-slate-300 outline-1 outline text-xs rounded-md px-2 p-1'>
 								60 FPS
 							</button>
-							<button on:click={()=>{RECORD_FRAMERATE = 120}} class='{RECORD_FRAMERATE === 120 ? 'bg-slate-300 text-black' : '-outline-offset-1 bg-black outline-slate-300 outline-1 outline text-slate-300'} rounded-md px-2 p-1 text-xs'>
+							<button on:click={()=>{RECORD_FRAMERATE = 120}} class='duration-200 {RECORD_FRAMERATE === 120 ? 'bg-slate-300 text-black' : 'text-slate-300 bg-black'} -outline-offset-1 outline-slate-300 outline-1 outline text-xs rounded-md px-2 p-1'>
 								120 FPS
 							</button>
 						</div>
