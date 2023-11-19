@@ -15,9 +15,11 @@
 		"test:unit": "vitest"
 	},
 	"devDependencies": {
+		"@iconify/json": "^2.2.143",
 		"@playwright/test": "^1.28.1",
 		"@sveltejs/adapter-auto": "^2.0.0",
 		"@sveltejs/kit": "^1.27.4",
+		"@sveltejs/vite-plugin-svelte": "^3.0.0",
 		"@tailwindcss/typography": "^0.5.10",
 		"@typescript-eslint/eslint-plugin": "^6.0.0",
 		"@typescript-eslint/parser": "^6.0.0",
@@ -34,15 +36,21 @@
 		"tailwindcss": "^3.3.5",
 		"tslib": "^2.4.1",
 		"typescript": "^5.0.0",
+		"unplugin-icons": "^0.17.4",
 		"vite": "^4.4.2",
 		"vitest": "^0.32.2"
 	},
 	"type": "module",
 	"dependencies": {
+		"@ffmpeg/ffmpeg": "^0.12.7",
+		"@ffmpeg/util": "^0.12.1",
 		"@shoelace-style/shoelace": "^2.11.2",
 		"@thednp/color-picker": "2.0.0-alpha10",
+		"canvas-capture": "^2.1.1",
+		"ccapture.js": "^1.1.0",
 		"chroma-js": "^2.4.2",
 		"svelte-awesome-color-picker": "^2.4.8",
-		"twgl.js": "^5.5.3"
+		"twgl.js": "^5.5.3",
+		"webm-muxer": "^3.1.3"
 	}
 }
