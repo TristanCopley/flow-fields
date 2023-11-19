@@ -669,7 +669,7 @@
 			<div
 				bind:this={settings}
 				id="settings"
-				class="flex flex-col absolute bg-black border-2 border-zinc-300 w-72 h-fit !text-slate-300 z-50 pointer-events-auto outline outline-offset-0 outline-1 outline-black"
+				class="flex flex-col absolute bg-black/90 border-2 border-zinc-300 w-72 h-fit !text-slate-300 z-50 pointer-events-auto outline outline-offset-0 outline-1 outline-black"
 			>
 				<button
 					id="settingsheader"
@@ -856,16 +856,16 @@
 
 					<div class="flex flex-col gap-1 justify-between text-slate-300 px-1 pb-1">
 						<div class='flex'>
-							<span class="text-xs">RECORDING FRAMERATE</span>
+							<span class="text-xs">RENDER FRAMERATE</span>
 						</div>
 						<div class='flex gap-2'>
-							<button on:click={()=>{RECORD_FRAMERATE = 30}} class='{RECORD_FRAMERATE === 30 ? 'bg-slate-300 text-black' : 'bg-black outline-slate-300 outline-1 outline text-slate-300'} text-xs rounded-md px-2 p-1'>
+							<button on:click={()=>{RECORD_FRAMERATE = 30}} class='{RECORD_FRAMERATE === 30 ? 'bg-slate-300 text-black' : '-outline-offset-1 bg-black outline-slate-300 outline-1 outline text-slate-300'} text-xs rounded-md px-2 p-1'>
 								30 FPS
 							</button>
-							<button on:click={()=>{RECORD_FRAMERATE = 60}} class='{RECORD_FRAMERATE === 60 ? 'bg-slate-300 text-black' : 'bg-black outline-slate-300 outline-1 outline text-slate-300'} rounded-md px-2 p-1 text-xs'>
+							<button on:click={()=>{RECORD_FRAMERATE = 60}} class='{RECORD_FRAMERATE === 60 ? 'bg-slate-300 text-black' : '-outline-offset-1 bg-black outline-slate-300 outline-1 outline text-slate-300'} rounded-md px-2 p-1 text-xs'>
 								60 FPS
 							</button>
-							<button on:click={()=>{RECORD_FRAMERATE = 120}} class='{RECORD_FRAMERATE === 120 ? 'bg-slate-300 text-black' : 'bg-black outline-slate-300 outline-1 outline text-slate-300'} rounded-md px-2 p-1 text-xs'>
+							<button on:click={()=>{RECORD_FRAMERATE = 120}} class='{RECORD_FRAMERATE === 120 ? 'bg-slate-300 text-black' : '-outline-offset-1 bg-black outline-slate-300 outline-1 outline text-slate-300'} rounded-md px-2 p-1 text-xs'>
 								120 FPS
 							</button>
 						</div>
