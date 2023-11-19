@@ -49,6 +49,7 @@
 		"canvas-capture": "^2.1.1",
 		"ccapture.js": "^1.1.0",
 		"chroma-js": "^2.4.2",
+		"mp4-muxer": "^3.0.2",
 		"svelte-awesome-color-picker": "^2.4.8",
 		"twgl.js": "^5.5.3",
 		"webm-muxer": "^3.1.3"

@@ -3,13 +3,17 @@
 	import chroma from 'chroma-js';
 	import * as twgl from 'twgl.js/dist/5.x/twgl-full.js';
 	import ColorPicker from 'svelte-awesome-color-picker';
-	import { ArrayBufferTarget, Muxer } from 'webm-muxer';
+	import { ArrayBufferTarget, Muxer } from 'mp4-muxer';
+
+	// import iterate_worker from './worker?worker';
 
 	import LucideGripVertical from '~icons/lucide/grip-vertical';
 	import LucideCircleDot from '~icons/lucide/circle-dot';
 	import LucideMinus from '~icons/lucide/minus';
 
 	import img from '$lib/images/flag.png';
+
+	let worker: Worker;
 
 	let rgba: {
 		r: number;
@@ -35,6 +39,13 @@
 	let is_recording = false;
 	let FRAMES = 0;
 	let video_url: string;
+
+	let muxer: any = null;
+	let videoEncoder: VideoEncoder;
+
+	let bufferInfo: any = null;
+
+	let enable_web_worker = false;
 
 	const m4 = twgl.m4;
 	twgl.setDefaults({ attribPrefix: 'a_' });
@@ -78,6 +89,8 @@
 	let SPEED = 1;
 	let RECORD_FRAMERATE = 30;
 
+	let RENDER_RESOLUTION = 10;
+
 	let line_count_bind = LINE_COUNT;
 	let trail_count_bind = TRAIL_COUNT;
 	let scale_bind = SCALE;
@@ -85,14 +98,33 @@
 	let background_color_bind = BACKGROUND_COLOR;
 	let canvas_detail_bind = CANVAS_DETAIL;
 	let speed_bind = SPEED;
+	let render_resolution_bind = RENDER_RESOLUTION;
+
+	let uniforms;
+	let programInfo;
+
+	let position_array = [] as number[];
+	let color_array = [] as number[];
 
 	$: {
 		lines = [];
 		LINE_COUNT = Math.round(line_count_bind ** 2.2);
+		worker?.postMessage({
+			type: 'update',
+			data: {
+				line_count: LINE_COUNT
+			}
+		});
 	}
 	$: {
 		lines = [];
 		TRAIL_COUNT = trail_count_bind;
+		worker?.postMessage({
+			type: 'update',
+			data: {
+				trail_count: TRAIL_COUNT
+			}
+		});
 	}
 	$: {
 		SCALE = scale_bind;
@@ -136,6 +168,17 @@
 	$: {
 		lines = [];
 		SPEED = parseFloat((speed_bind * speed_bind * speed_bind).toFixed(3));
+		worker?.postMessage({
+			type: 'update',
+			data: {
+				speed: SPEED
+			}
+		});
+	}
+
+	$: {
+		lines = [];
+		RENDER_RESOLUTION = parseFloat((2 ** render_resolution_bind).toFixed(3));
 	}
 
 	let flow_field: {
@@ -229,8 +272,8 @@
 	async function createFlowField() {
 		let flow_field_array = [] as number[][][];
 
-		const cw = CANVAS_DETAIL * 2;
-		const ch = CANVAS_DETAIL;
+		const cw = Math.floor(CANVAS_DETAIL * 0.5) * 2;
+		const ch = Math.floor(CANVAS_DETAIL * 0.5);
 
 		ff_canvas.width = cw;
 		ff_canvas.height = ch;
@@ -238,21 +281,6 @@
 		let ff_ctx = ff_canvas.getContext('2d', {
 			willReadFrequently: true
 		}) as CanvasRenderingContext2D;
-
-		// ff_ctx.fillStyle = 'gray';
-		// ff_ctx.fillRect(0, 0, CANVAS_DETAIL * 2, CANVAS_DETAIL);
-
-		// ff_ctx.fillStyle = 'yellow';
-		// ff_ctx.fillRect(0, 0, cw * 0.5, ch * 0.5);
-
-		// ff_ctx.fillStyle = 'blue';
-		// ff_ctx.fillRect(cw * 0.5, 0, cw * 0.5, ch * 0.5);
-
-		// ff_ctx.fillStyle = 'green';
-		// ff_ctx.fillRect(cw * 0.5, ch * 0.5, cw * 0.5, ch * 0.5);
-
-		// ff_ctx.fillStyle = 'white';
-		// ff_ctx.fillRect(cw * 0.25, ch * 0.25, cw * 0.5, ch * 0.5);
 
 		let image = await addImageProcess(IMAGE);
 		ff_ctx.drawImage(image, 0, 0, cw, ch);
@@ -271,6 +299,17 @@
 				flow_field_array[x][y] = [r, g, b, a]; //(r+g+b)/(3*255) * Math.PI * 2;
 			}
 		}
+
+		worker.postMessage({
+			type: 'update',
+			data: {
+				flow_field: {
+					array: flow_field_array,
+					width,
+					height
+				}
+			}
+		});
 
 		return {
 			array: flow_field_array,
@@ -293,14 +332,7 @@
 		][clamp(Math.floor(((y + 1) / 2) * flow_field.height), 0, flow_field.height - 1)];
 	}
 
-	/** RECORDING & MUXING STUFF */
-
-	let muxer = null;
-	let videoEncoder = null;
-
 	const startRecording = async () => {
-		FRAMES = 0;
-
 		// Check for VideoEncoder availability
 		if (typeof VideoEncoder === 'undefined') {
 			alert("Looks like your user agent doesn't support VideoEncoder / WebCodecs API yet.");
@@ -311,33 +343,34 @@
 		muxer = new Muxer({
 			target: new ArrayBufferTarget(),
 			video: {
-				codec: 'V_VP9',
-				width: canvas.width,
-				height: canvas.height,
+				codec: 'avc',
+				width: Math.floor(RENDER_RESOLUTION * 0.5) * 2,
+				height: Math.floor(RENDER_RESOLUTION * 0.5),
 				frameRate: RECORD_FRAMERATE
 			},
-			firstTimestampBehavior: 'offset' // Because we're directly piping a MediaStreamTrack's data into it
+			fastStart: false,
+			firstTimestampBehavior: 'offset'
 		});
 
 		videoEncoder = new VideoEncoder({
 			output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
 			error: (e) => console.error(e)
-		});
+		}) as VideoEncoder;
 
 		videoEncoder.configure({
-			codec: 'vp09.00.10.08',
-			width: canvas.width,
-			height: canvas.height,
-			bitrate: 1e6
+			codec: 'avc1.420033',
+			width: Math.floor(RENDER_RESOLUTION * 0.5) * 2,
+			height: Math.floor(RENDER_RESOLUTION * 0.5),
+			bitrate: 1e8
 		});
 
-		is_recording = true;
-
+		FRAMES = 0;
 		encodeVideoFrame();
-		//intervalId = setInterval(encodeVideoFrame, 1000/30);
+
+		is_recording = true;
 	};
 
-	const encodeVideoFrame = () => {
+	const encodeVideoFrame = async () => {
 		let elapsedTime = (FRAMES * 1000) / RECORD_FRAMERATE;
 		let frame = new VideoFrame(canvas, {
 			timestamp: elapsedTime * 1000
@@ -350,7 +383,7 @@
 	const endRecording = async () => {
 		//clearInterval(intervalId);
 		is_recording = false;
-		video_url = null;
+		video_url = '';
 
 		RECORD_MESSAGE = 'Encoding...';
 
@@ -360,23 +393,90 @@
 		RECORD_MESSAGE = 'Downloading...';
 
 		let { buffer } = muxer.target;
-		downloadBlob(new Blob([buffer]));
+		await downloadBlob(new Blob([buffer]));
 	};
 
-	const downloadBlob = (blob: Blob) => {
+	const downloadBlob = async (blob: Blob) => {
+		if (video_url) window.URL.revokeObjectURL(video_url);
 		let url = window.URL.createObjectURL(blob);
-		// window.URL.revokeObjectURL(url);
-
 		video_url = url;
 	};
+
+	async function render_end() {
+
+		bufferInfo = twgl.createBufferInfoFromArrays(gl, {
+			position: {
+				data: position_array,
+				numComponents: 2
+			},
+			color: {
+				data: color_array,
+				numComponents: 4
+			}
+		});
+
+		// render stuff
+		twgl.resizeCanvasToDisplaySize(canvas);
+		gl.viewport(0, 0, gl.canvas.width * 1, gl.canvas.height * 1);
+
+		gl.enable(gl.DEPTH_TEST);
+		gl.enable(gl.CULL_FACE);
+		gl.clearColor(1, 1, 1, 0);
+		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+		// Something with camera
+		const aspect = canvas.width / canvas.height;
+		m4.ortho(-aspect, aspect, 1, -1, -1, 1, uniforms.u_matrix);
+
+		gl.useProgram(programInfo.program);
+		twgl.setBuffersAndAttributes(gl, programInfo, bufferInfo);
+		twgl.setUniforms(programInfo, uniforms);
+
+		twgl.drawBufferInfo(gl, bufferInfo, gl.LINES);
+		if (is_recording) {
+			await encodeVideoFrame();
+		}
+
+		/*
+		let memory = window.performance.memory;
+		console.log(Math.round(100 * (memory.usedJSHeapSize / memory.jsHeapSizeLimit)) / 100);
+		*/
+
+		requestAnimationFrame(animate);
+
+	}
 
 	onMount(async () => {
 		dragElement(settings, true);
 		dragElement(canvas_container, false);
 
+		let workerImport = await import('./render_worker?worker');
+		worker = new workerImport.default();
+
+		worker.onmessage = async function (e) {
+			const { type, data } = e.data;
+
+			if (type === 'iterate') {
+
+				let f32_position_array_buffer = data.f32_position_array_buffer;
+				let f32_color_array_buffer = data.f32_color_array_buffer;
+
+				position_array = Array.from(f32_position_array_buffer);
+				color_array = Array.from(f32_color_array_buffer);
+
+				if (is_recording) {
+					FRAMES++;
+				}
+
+				await render_end();
+			}
+
+		};
+
 		gl = canvas.getContext('webgl', {
 			premultipliedAlpha: false,
-			willReadFrequently: true
+			willReadFrequently: true,
+			antialias: true
 		}) as WebGLRenderingContext;
 		if (!gl) return console.error('No context');
 
@@ -384,14 +484,11 @@
 
 		mounted = true;
 
-		const programInfo = twgl.createProgramInfo(gl, [vs, fs]);
+		programInfo = twgl.createProgramInfo(gl, [vs, fs]);
 
-		let position_array = [] as number[];
-		let color_array = [] as number[];
+		bufferInfo = instantiateBuffer(gl);
 
-		let bufferInfo = instantiateBuffer(gl);
-
-		const uniforms = {
+		uniforms = {
 			u_matrix: m4.identity()
 		};
 
@@ -399,13 +496,25 @@
 		let last_time = 0;
 		let interval = 0;
 
-		animate = (time = 0) => {
-			requestAnimationFrame(animate);
+		animate = async (time = 0) => {
 
 			delta_time = time - last_time;
 			last_time = time;
 
-			delta_time = 1;
+			delta_time = 30 / RECORD_FRAMERATE;
+
+			if (enable_web_worker) {
+
+				worker.postMessage({
+					type: 'iterate',
+					data: {
+						delta_time
+					}
+				});
+
+				return;
+
+			}
 
 			position_array = [];
 			color_array = [];
@@ -514,38 +623,8 @@
 				}
 			}
 
-			bufferInfo = twgl.createBufferInfoFromArrays(gl, {
-				position: {
-					data: position_array,
-					numComponents: 2
-				},
-				color: {
-					data: color_array,
-					numComponents: 4
-				}
-			});
+			await render_end();
 
-			// render stuff
-			twgl.resizeCanvasToDisplaySize(canvas);
-			gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-
-			gl.enable(gl.DEPTH_TEST);
-			gl.enable(gl.CULL_FACE);
-			gl.clearColor(1, 1, 1, 0);
-			gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-			// Something with camera
-			const aspect = canvas.width / canvas.height;
-			m4.ortho(-aspect, aspect, 1, -1, -1, 1, uniforms.u_matrix);
-
-			gl.useProgram(programInfo.program);
-			twgl.setBuffersAndAttributes(gl, programInfo, bufferInfo);
-			twgl.setUniforms(programInfo, uniforms);
-
-			twgl.drawBufferInfo(gl, bufferInfo, gl.LINES);
-			if (is_recording) {
-				encodeVideoFrame();
-			}
 		};
 
 		animate();
@@ -586,7 +665,7 @@
 			// set the element's new position:
 			elmnt.style.top = clamp(elmnt.offsetTop - pos2, 0, window.innerHeight - 40) + 'px'; //(elmnt.offsetTop - pos2) + 'px'
 			elmnt.style.left =
-				clamp(elmnt.offsetLeft - pos1, 0, window.innerWidth - elmnt.clientWidth) + 'px'; // (elmnt.offsetLeft - pos1) + 'px';
+				clamp(elmnt.offsetLeft - pos1, 0, window.innerWidth - elmnt.offsetWidth * 0.9) + 'px'; // (elmnt.offsetLeft - pos1) + 'px';
 		}
 
 		function elementDrag(e: MouseEvent) {
@@ -612,24 +691,11 @@
 
 <svelte:window
 	on:resize={async () => {
-		canvas.width = 2 * Math.floor(window.innerHeight);
-		canvas.height = Math.floor(window.innerHeight);
+		canvas.width = Math.floor(RENDER_RESOLUTION * 0.5) * 2;
+		canvas.height = Math.floor(RENDER_RESOLUTION * 0.5);
 		flow_field = await createFlowField();
 	}}
 />
-
-<!--
-
-	let IMAGE = img;
-	let LINE_COUNT = 10000;
-	let TRAIL_COUNT = 4;
-	let INTERVAL_LENGTH = 40;
-	let SCALE = 0.5;
-	let OPACITY = 1;
-	let CANVAS_DETAIL = 600;
-	let BACKGROUND_COLOR = 'black';
-
--->
 
 <div
 	class="w-screen h-screen flex flex-col justify-center overflow-clip relative"
@@ -658,10 +724,18 @@
 		>
 			<canvas
 				bind:this={ff_canvas}
-				class="z-0 absolute self-center h-screen"
+				class="z-0 absolute self-center h-full"
 				style="opacity: {OPACITY};"
 			/>
-			<canvas bind:this={canvas} id="canvas" class="z-10 absolute self-center h-screen" />
+			<canvas
+				bind:this={canvas}
+				id="canvas"
+				class="z-10 absolute self-center"
+				style="transform: scale({ff_canvas?.offsetHeight / Math.floor(0.5 * RENDER_RESOLUTION) ||
+					1}); width: {Math.floor(RENDER_RESOLUTION * 0.5) * 2}px; height: {Math.floor(
+					RENDER_RESOLUTION * 0.5
+				)}px;"
+			/>
 		</div>
 	</div>
 	<div class="z-40 w-screen h-screen absolute flex left-0 top-0 pointer-events-none">
@@ -669,7 +743,7 @@
 			<div
 				bind:this={settings}
 				id="settings"
-				class="flex flex-col absolute bg-black/90 border-2 border-zinc-300 w-72 h-fit !text-slate-300 z-50 pointer-events-auto outline outline-offset-0 outline-1 outline-black"
+				class="scale-90 flex flex-col absolute bg-black/90 border-2 border-zinc-300 w-72 h-fit !text-slate-300 z-50 pointer-events-auto outline outline-offset-0 outline-1 outline-black"
 			>
 				<button
 					id="settingsheader"
@@ -759,7 +833,7 @@
 							<input
 								type="range"
 								min="0"
-								max="80"
+								max="100"
 								class="self-center range range-xs"
 								bind:value={canvas_detail_bind}
 							/>
@@ -825,7 +899,7 @@
 									{:else}
 										<span class="text-xs self-center">
 											{#if video_url}
-												<a class="text-slate-300" download="flow-field.webm" href={video_url}>
+												<a class="text-slate-300" download="flow-field.mp4" href={video_url}>
 													Download
 												</a>
 											{:else}
@@ -855,19 +929,71 @@
 					</div>
 
 					<div class="flex flex-col gap-1 justify-between text-slate-300 px-1 pb-1">
-						<div class='flex'>
+						<div class="flex">
 							<span class="text-xs">RENDER FRAMERATE</span>
 						</div>
-						<div class='flex gap-2 duration-200 {is_recording ? 'pointer-events-none opacity-30' : 'pointer-events-auto'}'>
-							<button on:click={()=>{RECORD_FRAMERATE = 30}} class='duration-200 {RECORD_FRAMERATE === 30 ? 'bg-slate-300 text-black' : 'text-slate-300 bg-black'} -outline-offset-1 outline-slate-300 outline-1 outline text-xs rounded-md px-2 p-1'>
+						<div
+							class="flex gap-2 duration-200 {is_recording
+								? 'pointer-events-none opacity-30'
+								: 'pointer-events-auto'}"
+						>
+							<button
+								on:click={() => {
+									RECORD_FRAMERATE = 30;
+								}}
+								class="duration-200 {RECORD_FRAMERATE === 30
+									? 'bg-slate-300 text-black'
+									: 'text-slate-300 bg-black'} -outline-offset-1 outline-slate-300 outline-1 outline text-xs rounded-md p-1"
+							>
 								30 FPS
 							</button>
-							<button on:click={()=>{RECORD_FRAMERATE = 60}} class='duration-200 {RECORD_FRAMERATE === 60 ? 'bg-slate-300 text-black' : 'text-slate-300 bg-black'} -outline-offset-1 outline-slate-300 outline-1 outline text-xs rounded-md px-2 p-1'>
+							<button
+								on:click={() => {
+									RECORD_FRAMERATE = 60;
+								}}
+								class="duration-200 {RECORD_FRAMERATE === 60
+									? 'bg-slate-300 text-black'
+									: 'text-slate-300 bg-black'} -outline-offset-1 outline-slate-300 outline-1 outline text-xs rounded-md p-1"
+							>
 								60 FPS
 							</button>
-							<button on:click={()=>{RECORD_FRAMERATE = 120}} class='duration-200 {RECORD_FRAMERATE === 120 ? 'bg-slate-300 text-black' : 'text-slate-300 bg-black'} -outline-offset-1 outline-slate-300 outline-1 outline text-xs rounded-md px-2 p-1'>
+							<button
+								on:click={() => {
+									RECORD_FRAMERATE = 120;
+								}}
+								class="duration-200 {RECORD_FRAMERATE === 120
+									? 'bg-slate-300 text-black'
+									: 'text-slate-300 bg-black'} -outline-offset-1 outline-slate-300 outline-1 outline text-xs rounded-md p-1"
+							>
 								120 FPS
 							</button>
+							<button
+								on:click={() => {
+									RECORD_FRAMERATE = 240;
+								}}
+								class="duration-200 {RECORD_FRAMERATE === 240
+									? 'bg-slate-300 text-black'
+									: 'text-slate-300 bg-black'} -outline-offset-1 outline-slate-300 outline-1 outline text-xs rounded-md p-1"
+							>
+								240 FPS
+							</button>
+						</div>
+					</div>
+
+					<div class="w-full flex flex-col gap-1">
+						<span class="text-xs"> </span>
+						<div class="flex gap-2 justify-between w-full">
+							<input
+								type="range"
+								min="8"
+								max="12"
+								step="1"
+								class="self-center range range-xs"
+								bind:value={render_resolution_bind}
+							/>
+							<span class="w-20">
+								{RENDER_RESOLUTION}
+							</span>
 						</div>
 					</div>
 				</div>
@@ -880,5 +1006,8 @@
 	.file-input::file-selector-button {
 		color: black;
 		@apply rounded-none bg-slate-300;
+	}
+	#settings {
+		transform-origin: top left;
 	}
 </style>
