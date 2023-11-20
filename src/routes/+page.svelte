@@ -809,7 +809,7 @@
 							<input
 								type="range"
 								min="0"
-								max="400"
+								max="600"
 								class="self-center range range-xs"
 								bind:value={line_count_bind}
 							/>
