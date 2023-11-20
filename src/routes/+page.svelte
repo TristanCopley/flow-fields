@@ -233,7 +233,7 @@
 
 		lines.push({
 			speed: (Math.random() + 0.3) * SPEED,
-			life: 100 + Math.random() * 200,
+			life: 2 + Math.random() * 298,
 			x: x,
 			y: y,
 			max_trail_length: trails.length,
