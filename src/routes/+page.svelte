@@ -45,7 +45,7 @@
 
 	let bufferInfo: any = null;
 
-	let enable_web_worker = false;
+	let enable_web_worker = true;
 
 	const m4 = twgl.m4;
 	twgl.setDefaults({ attribPrefix: 'a_' });
@@ -458,11 +458,46 @@
 
 			if (type === 'iterate') {
 
-				let f32_position_array_buffer = data.f32_position_array_buffer;
-				let f32_color_array_buffer = data.f32_color_array_buffer;
+				let f32_position_array = new Float32Array(data.f32_position_array_buffer);
+				let f32_color_array = new Float32Array(data.f32_color_array_buffer);
 
-				position_array = Array.from(f32_position_array_buffer);
-				color_array = Array.from(f32_color_array_buffer);
+				// Convert f32 arrays to standard arrays, but do not block main thread
+
+				position_array = [];
+				color_array = [];
+
+				let f32posarrlend2 = f32_position_array.length / 2;
+
+				await new Promise((resolve) => {
+					let i = 0;
+					let i2 = i*2;
+					let i3 = i*3;
+					let interval = setInterval(() => {
+
+						for (let k = 0; k < 80000; k++){
+
+							i2 = i*2;
+							i3 = i*3;
+
+							position_array.push(f32_position_array[i2]);
+							position_array.push(f32_position_array[i2 + 1]);
+
+							color_array.push(f32_color_array[i3]);
+							color_array.push(f32_color_array[i3 + 1]);
+							color_array.push(f32_color_array[i3 + 2]);
+
+							i++;
+
+							if (i >= f32posarrlend2) {
+								clearInterval(interval);
+								resolve(null);
+								return;
+							}
+						}
+
+						if (Math.random() > 0.95) console.log(i);
+					}, 0);
+				});
 
 				if (is_recording) {
 					FRAMES++;
@@ -693,7 +728,6 @@
 	on:resize={async () => {
 		canvas.width = Math.floor(RENDER_RESOLUTION * 0.5) * 2;
 		canvas.height = Math.floor(RENDER_RESOLUTION * 0.5);
-		flow_field = await createFlowField();
 	}}
 />
 
@@ -743,11 +777,11 @@
 			<div
 				bind:this={settings}
 				id="settings"
-				class="scale-90 flex flex-col absolute bg-black/90 border-2 border-zinc-300 w-72 h-fit !text-slate-300 z-50 pointer-events-auto outline outline-offset-0 outline-1 outline-black"
+				class="scale-90 flex flex-col absolute bg-black/90 border-2 border-slate-300 w-80 h-fit !text-slate-300 z-50 pointer-events-auto outline outline-offset-0 outline-1 outline-black"
 			>
 				<button
 					id="settingsheader"
-					class="h-fit bg-slate-300 w-full py-1 flex justify-start {grabbing
+					class="h-fit bg-slate-300 w-full py-1 flex justify-between {grabbing
 						? 'cursor-grabbing'
 						: 'cursor-grab'}"
 					on:mouseup={() => {
@@ -758,6 +792,14 @@
 					}}
 				>
 					<LucideGripVertical class="w-6 h-6 text-black" />
+					<div class='flex self-center gap-2 px-2'>
+						{#if enable_web_worker}
+							<span class="text-xs text-green-900 self-center font-bold">WEBWORKER ENABLED</span>
+						{:else}
+							<span class="text-xs text-red-900 self-center font-bold">WEBWORKER DISABLED</span>
+						{/if}
+						<input type="checkbox" class="toggle toggle-sm rounded-none self-center" bind:checked={enable_web_worker} />
+					</div>
 				</button>
 
 				<div class="flex flex-col relative w-full gap-2 p-2 py-3">
@@ -833,7 +875,7 @@
 							<input
 								type="range"
 								min="0"
-								max="100"
+								max="200"
 								class="self-center range range-xs"
 								bind:value={canvas_detail_bind}
 							/>
