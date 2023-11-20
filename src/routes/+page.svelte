@@ -820,7 +820,7 @@
 					</div>
 
 					<div class="w-full flex flex-col gap-1">
-						<span class="text-xs"> TRAIL COUNT </span>
+						<span class="text-xs"> TRAIL LENGTH </span>
 						<div class="flex gap-2 justify-between w-full">
 							<input
 								type="range"
