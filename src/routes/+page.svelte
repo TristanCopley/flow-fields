@@ -45,7 +45,7 @@
 
 	let bufferInfo: any = null;
 
-	let enable_web_worker = true;
+	let enable_web_worker = false;
 
 	const m4 = twgl.m4;
 	twgl.setDefaults({ attribPrefix: 'a_' });
