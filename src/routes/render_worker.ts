@@ -153,11 +153,11 @@ self.onmessage = (e: {
 
             line.color = chroma(r, g, b).gl(); // chroma((line.xv * 600) ** 2, (line.yv * 600)** 2, 0.5, 'hsl').gl();
 
-            if (line.x > 2.1 || line.x < -2.1) {
+            if (line.x > 2 || line.x < -2) {
                 line.life = 0;
             }
 
-            if (line.y > 1.05 || line.y < -1.05) {
+            if (line.y > 1 || line.y < -1) {
                 line.life = 0;
             }
 
