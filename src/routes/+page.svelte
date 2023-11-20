@@ -1023,7 +1023,7 @@
 					</div>
 
 					<div class="w-full flex flex-col gap-1">
-						<span class="text-xs"> </span>
+						<span class="text-xs"> RENDER RESOLUTION </span>
 						<div class="flex gap-2 justify-between w-full">
 							<input
 								type="range"
