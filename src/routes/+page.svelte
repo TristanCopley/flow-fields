@@ -83,7 +83,7 @@
 	let TRAIL_COUNT = 10;
 	let INTERVAL_LENGTH = 10;
 	let SCALE = 0.5;
-	let OPACITY = 0.1;
+	let OPACITY = 0;
 	let BACKGROUND_COLOR = 'black';
 	let CANVAS_DETAIL = 30;
 	let SPEED = 1;
