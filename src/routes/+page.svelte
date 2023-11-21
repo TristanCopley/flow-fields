@@ -403,7 +403,6 @@
 	};
 
 	async function render_end() {
-
 		bufferInfo = twgl.createBufferInfoFromArrays(gl, {
 			position: {
 				data: position_array,
@@ -443,7 +442,6 @@
 		*/
 
 		requestAnimationFrame(animate);
-
 	}
 
 	onMount(async () => {
@@ -457,7 +455,6 @@
 			const { type, data } = e.data;
 
 			if (type === 'iterate') {
-
 				let f32_position_array = new Float32Array(data.f32_position_array_buffer);
 				let f32_color_array = new Float32Array(data.f32_color_array_buffer);
 
@@ -470,14 +467,12 @@
 
 				await new Promise((resolve) => {
 					let i = 0;
-					let i2 = i*2;
-					let i3 = i*3;
+					let i2 = i * 2;
+					let i3 = i * 3;
 					let interval = setInterval(() => {
-
-						for (let k = 0; k < 80000; k++){
-
-							i2 = i*2;
-							i3 = i*3;
+						for (let k = 0; k < 80000; k++) {
+							i2 = i * 2;
+							i3 = i * 3;
 
 							position_array.push(f32_position_array[i2]);
 							position_array.push(f32_position_array[i2 + 1]);
@@ -505,7 +500,6 @@
 
 				await render_end();
 			}
-
 		};
 
 		gl = canvas.getContext('webgl', {
@@ -532,14 +526,12 @@
 		let interval = 0;
 
 		animate = async (time = 0) => {
-
 			delta_time = time - last_time;
 			last_time = time;
 
 			delta_time = 30 / RECORD_FRAMERATE;
 
 			if (enable_web_worker) {
-
 				worker.postMessage({
 					type: 'iterate',
 					data: {
@@ -548,7 +540,6 @@
 				});
 
 				return;
-
 			}
 
 			position_array = [];
@@ -659,7 +650,6 @@
 			}
 
 			await render_end();
-
 		};
 
 		animate();
@@ -792,13 +782,17 @@
 					}}
 				>
 					<LucideGripVertical class="w-6 h-6 text-black" />
-					<div class='flex self-center gap-2 px-2'>
+					<div class="flex self-center gap-2 px-2">
 						{#if enable_web_worker}
 							<span class="text-xs text-green-900 self-center font-bold">WEBWORKER ENABLED</span>
 						{:else}
 							<span class="text-xs text-red-900 self-center font-bold">WEBWORKER DISABLED</span>
 						{/if}
-						<input type="checkbox" class="toggle toggle-sm rounded-none self-center" bind:checked={enable_web_worker} />
+						<input
+							type="checkbox"
+							class="toggle toggle-sm rounded-none self-center"
+							bind:checked={enable_web_worker}
+						/>
 					</div>
 				</button>
 
