@@ -436,11 +436,6 @@
 			await encodeVideoFrame();
 		}
 
-		/*
-		let memory = window.performance.memory;
-		console.log(Math.round(100 * (memory.usedJSHeapSize / memory.jsHeapSizeLimit)) / 100);
-		*/
-
 		requestAnimationFrame(animate);
 	}
 
@@ -489,8 +484,6 @@
 								return;
 							}
 						}
-
-						if (Math.random() > 0.95) console.log(i);
 					}, 0);
 				});
 
